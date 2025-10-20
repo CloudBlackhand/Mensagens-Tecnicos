@@ -27,7 +27,8 @@ RUN npm run build
 WORKDIR /app/apps/backend
 RUN npm run build
 
-# Configurar usuário não-root
+# Voltar para diretório raiz e configurar usuário não-root
+WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 USER nextjs
