@@ -50,11 +50,19 @@ RUN if [ -d "/app/apps/backend/node_modules/.prisma/client" ]; then \
 RUN find /app/apps/backend/node_modules/.prisma/client -name "*.node" -exec cp {} /app/apps/backend/dist/ \; 2>/dev/null || true
 RUN find /app/apps/backend/node_modules/.prisma/client -name "*.node" -exec cp {} /app/apps/backend/dist/node_modules/.prisma/client/ \; 2>/dev/null || true
 
+# Encontrar e definir o caminho correto do engine
+RUN ENGINE_PATH=$(find /app/apps/backend/node_modules/.prisma/client -name "libquery_engine-linux-musl-openssl-3.0.x.so.node" 2>/dev/null | head -1) && \
+    if [ -n "$ENGINE_PATH" ]; then \
+      echo "PRISMA_QUERY_ENGINE_LIBRARY=$ENGINE_PATH" >> /etc/environment; \
+      echo "export PRISMA_QUERY_ENGINE_LIBRARY=$ENGINE_PATH" >> /etc/profile; \
+    fi
+
 # Verificar se o engine foi copiado corretamente
 RUN ls -la /app/apps/backend/dist/node_modules/.prisma/client/ || true
 RUN ls -la /app/.prisma/client/ || true
 RUN ls -la /tmp/prisma-engines/ || true
 RUN find /app/apps/backend/dist -name "*.node" -ls || true
+RUN find /app/apps/backend/node_modules/.prisma/client -name "*linux-musl-openssl-3.0.x*" -ls || true
 
 # Voltar para diretório raiz e configurar usuário não-root
 WORKDIR /app
@@ -68,6 +76,9 @@ EXPOSE 3001
 # Variáveis de ambiente
 ENV NODE_ENV=production
 ENV PORT=3001
+
+# Configurar variáveis de ambiente para Prisma
+ENV PRISMA_QUERY_ENGINE_LIBRARY=/app/apps/backend/node_modules/.prisma/client/libquery_engine-linux-musl-openssl-3.0.x.so.node
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
