@@ -28,6 +28,18 @@ WORKDIR /app/apps/backend
 RUN npx prisma generate --force
 RUN npm run build
 
+# Copiar engines do Prisma para múltiplos locais
+RUN mkdir -p /app/apps/backend/dist/node_modules/.prisma/client
+RUN mkdir -p /app/.prisma/client
+RUN mkdir -p /tmp/prisma-engines
+
+# Copiar engines para todos os locais possíveis
+RUN if [ -d "/app/apps/backend/node_modules/.prisma/client" ]; then \
+      cp -r /app/apps/backend/node_modules/.prisma/client/* /app/apps/backend/dist/node_modules/.prisma/client/ 2>/dev/null || true; \
+      cp -r /app/apps/backend/node_modules/.prisma/client/* /app/.prisma/client/ 2>/dev/null || true; \
+      cp -r /app/apps/backend/node_modules/.prisma/client/* /tmp/prisma-engines/ 2>/dev/null || true; \
+    fi
+
 # Voltar para diretório raiz e configurar usuário não-root
 WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs
