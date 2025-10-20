@@ -25,7 +25,7 @@ RUN npm run build
 
 # Build backend
 WORKDIR /app/apps/backend
-RUN npx prisma generate
+RUN npx prisma generate --force
 RUN npm run build
 
 # Voltar para diretório raiz e configurar usuário não-root
