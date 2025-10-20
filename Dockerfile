@@ -1,59 +1,35 @@
-# Multi-stage build para otimização
-FROM node:18-alpine AS base
+# Dockerfile simplificado para Railway
+FROM node:18-alpine
 
 # Instalar dependências necessárias
 RUN apk add --no-cache libc6-compat
+
+# Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar arquivos de dependências
+# Copiar package.json files
 COPY package*.json ./
 COPY apps/backend/package*.json ./apps/backend/
-COPY apps/web/package*.json ./apps/web/
 COPY packages/shared/package*.json ./packages/shared/
 
-# Stage 1: Build shared package
-FROM base AS shared-builder
+# Instalar dependências
+RUN npm install --workspace=apps/backend --workspace=packages/shared
+
+# Copiar código fonte
+COPY apps/backend/ ./apps/backend/
+COPY packages/shared/ ./packages/shared/
+
+# Build shared package
 WORKDIR /app/packages/shared
-RUN npm ci --only=production
-COPY packages/shared/ .
 RUN npm run build
 
-# Stage 2: Build backend
-FROM base AS backend-builder
+# Build backend
 WORKDIR /app/apps/backend
-COPY --from=shared-builder /app/packages/shared/dist ./node_modules/@msgsystec/shared
-RUN npm ci --only=production
-COPY apps/backend/ .
 RUN npm run build
 
-# Stage 3: Build frontend
-FROM base AS frontend-builder
-WORKDIR /app/apps/web
-COPY --from=shared-builder /app/packages/shared/dist ./node_modules/@msgsystec/shared
-RUN npm ci --only=production
-COPY apps/web/ .
-RUN npm run build
-
-# Stage 4: Production
-FROM node:18-alpine AS runner
-WORKDIR /app
-
-# Criar usuário não-root para segurança
+# Configurar usuário não-root
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
-
-# Instalar apenas dependências de produção
-COPY --from=base /app/package*.json ./
-COPY --from=base /app/apps/backend/package*.json ./apps/backend/
-RUN npm ci --only=production --workspace=apps/backend
-
-# Copiar builds
-COPY --from=backend-builder --chown=nextjs:nodejs /app/apps/backend/dist ./apps/backend/dist
-COPY --from=frontend-builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
-COPY --from=frontend-builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=shared-builder --chown=nextjs:nodejs /app/packages/shared/dist ./packages/shared/dist
-
-# Configurar usuário
 USER nextjs
 
 # Expor porta
