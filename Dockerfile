@@ -25,7 +25,7 @@ RUN npm run build
 
 # Build backend
 WORKDIR /app/apps/backend
-RUN npx prisma generate --force
+RUN npx prisma generate
 RUN npm run build
 
 # Copiar engines do Prisma para múltiplos locais
