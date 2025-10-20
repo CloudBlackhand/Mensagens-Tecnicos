@@ -46,10 +46,15 @@ RUN if [ -d "/app/apps/backend/node_modules/.prisma/client" ]; then \
       cp -r /app/apps/backend/node_modules/.prisma/client/* /tmp/prisma-engines/ 2>/dev/null || true; \
     fi
 
+# Copiar engines específicos para o diretório dist
+RUN find /app/apps/backend/node_modules/.prisma/client -name "*.node" -exec cp {} /app/apps/backend/dist/ \; 2>/dev/null || true
+RUN find /app/apps/backend/node_modules/.prisma/client -name "*.node" -exec cp {} /app/apps/backend/dist/node_modules/.prisma/client/ \; 2>/dev/null || true
+
 # Verificar se o engine foi copiado corretamente
 RUN ls -la /app/apps/backend/dist/node_modules/.prisma/client/ || true
 RUN ls -la /app/.prisma/client/ || true
 RUN ls -la /tmp/prisma-engines/ || true
+RUN find /app/apps/backend/dist -name "*.node" -ls || true
 
 # Voltar para diretório raiz e configurar usuário não-root
 WORKDIR /app
