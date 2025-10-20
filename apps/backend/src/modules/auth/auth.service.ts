@@ -1,43 +1,46 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma/prisma.service';
+import { User } from '../../entities/user.entity';
+import { Session } from '../../entities/session.entity';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private prismaService: PrismaService,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+    @InjectRepository(Session)
+    private sessionRepository: Repository<Session>,
     private jwtService: JwtService,
     private configService: ConfigService,
   ) {}
 
   async validateGoogleUser(userData: any) {
-    const { googleId, email, name, picture, accessToken, refreshToken } = userData;
+    const { googleId, email, name, picture } = userData;
 
     // Buscar ou criar usuário
-    let user = await this.prismaService.user.findUnique({
+    let user = await this.userRepository.findOne({
       where: { googleId },
     });
 
     if (!user) {
-      user = await this.prismaService.user.create({
-        data: {
-          googleId,
-          email,
-          name,
-          picture,
-        },
+      user = this.userRepository.create({
+        googleId,
+        email,
+        name,
+        picture,
       });
+      user = await this.userRepository.save(user);
     } else {
       // Atualizar dados se necessário
-      user = await this.prismaService.user.update({
-        where: { googleId },
-        data: {
-          email,
-          name,
-          picture,
-        },
+      await this.userRepository.update(user.id, {
+        email,
+        name,
+        picture,
       });
+      user = await this.userRepository.findOne({ where: { id: user.id } });
     }
 
     return user;
@@ -57,13 +60,12 @@ export class AuthService {
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24); // 24 horas
 
-    await this.prismaService.session.create({
-      data: {
-        userId: user.id,
-        token: accessToken,
-        expiresAt,
-      },
+    const session = this.sessionRepository.create({
+      userId: user.id,
+      token: accessToken,
+      expiresAt,
     });
+    await this.sessionRepository.save(session);
 
     return {
       accessToken,
@@ -81,19 +83,15 @@ export class AuthService {
       const payload = this.jwtService.verify(token);
       
       // Verificar se a sessão existe e não expirou
-      const session = await this.prismaService.session.findFirst({
+      const session = await this.sessionRepository.findOne({
         where: {
           token,
-          expiresAt: {
-            gt: new Date(),
-          },
+          expiresAt: new Date(), // Verificar se não expirou
         },
-        include: {
-          user: true,
-        },
+        relations: ['user'],
       });
 
-      if (!session) {
+      if (!session || session.expiresAt <= new Date()) {
         throw new UnauthorizedException('Sessão inválida ou expirada');
       }
 
@@ -104,20 +102,16 @@ export class AuthService {
   }
 
   async logout(token: string) {
-    await this.prismaService.session.deleteMany({
-      where: { token },
-    });
+    await this.sessionRepository.delete({ token });
   }
 
   async cleanupExpiredSessions() {
-    const deleted = await this.prismaService.session.deleteMany({
-      where: {
-        expiresAt: {
-          lt: new Date(),
-        },
-      },
-    });
+    const result = await this.sessionRepository
+      .createQueryBuilder()
+      .delete()
+      .where('expiresAt < :now', { now: new Date() })
+      .execute();
 
-    return deleted.count;
+    return result.affected || 0;
   }
 }

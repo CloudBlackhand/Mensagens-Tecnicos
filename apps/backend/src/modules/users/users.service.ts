@@ -1,12 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '../../entities/user.entity';
 
 @Injectable()
 export class UsersService {
-  constructor(private prismaService: PrismaService) {}
+  constructor(
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+  ) {}
 
   async findById(id: string) {
-    const user = await this.prismaService.user.findUnique({
+    const user = await this.userRepository.findOne({
       where: { id },
     });
 
@@ -18,7 +23,7 @@ export class UsersService {
   }
 
   async findByEmail(email: string) {
-    const user = await this.prismaService.user.findUnique({
+    const user = await this.userRepository.findOne({
       where: { email },
     });
 
@@ -30,62 +35,47 @@ export class UsersService {
   }
 
   async findAll() {
-    return this.prismaService.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        picture: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    return this.userRepository.find({
+      select: ['id', 'email', 'name', 'picture', 'createdAt', 'updatedAt'],
     });
   }
 
   async update(id: string, updateData: any) {
-    const user = await this.prismaService.user.update({
-      where: { id },
-      data: {
-        name: updateData.name,
-        picture: updateData.picture,
-        updatedAt: new Date(),
-      },
+    await this.userRepository.update(id, {
+      name: updateData.name,
+      picture: updateData.picture,
+      updatedAt: new Date(),
     });
 
-    return user;
+    return this.findById(id);
   }
 
   async delete(id: string) {
-    // Primeiro deletar todas as sessões do usuário
-    await this.prismaService.session.deleteMany({
-      where: { userId: id },
-    });
-
-    // Depois deletar o usuário
-    const user = await this.prismaService.user.delete({
+    const user = await this.userRepository.findOne({
       where: { id },
-    });
-
-    return user;
-  }
-
-  async getUserStats(id: string) {
-    const user = await this.prismaService.user.findUnique({
-      where: { id },
-      include: {
-        sessions: {
-          where: {
-            expiresAt: {
-              gt: new Date(),
-            },
-          },
-        },
-      },
     });
 
     if (!user) {
       throw new NotFoundException('Usuário não encontrado');
     }
+
+    await this.userRepository.delete(id);
+    return user;
+  }
+
+  async getUserStats(id: string) {
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['sessions'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    const activeSessions = user.sessions?.filter(
+      session => session.expiresAt > new Date()
+    ).length || 0;
 
     return {
       id: user.id,
@@ -94,7 +84,7 @@ export class UsersService {
       picture: user.picture,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      activeSessions: user.sessions.length,
+      activeSessions,
     };
   }
 }

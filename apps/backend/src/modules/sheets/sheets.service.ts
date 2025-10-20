@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { google } from 'googleapis';
-import { PrismaService } from '../../prisma/prisma.service';
+import { SheetData } from '../../entities/sheet-data.entity';
 import { SheetsCacheService } from './sheets.cache.service';
 
 @Injectable()
@@ -10,8 +12,9 @@ export class SheetsService {
   private readonly sheetId: string;
 
   constructor(
+    @InjectRepository(SheetData)
+    private sheetDataRepository: Repository<SheetData>,
     private configService: ConfigService,
-    private prismaService: PrismaService,
     private sheetsCacheService: SheetsCacheService,
   ) {
     this.sheetId = this.configService.get<string>('GOOGLE_SHEET_ID');
@@ -79,18 +82,23 @@ export class SheetsService {
 
   private async saveSheetDataToDatabase(data: any): Promise<void> {
     try {
-      await this.prismaService.sheetData.upsert({
+      const existingData = await this.sheetDataRepository.findOne({
         where: { sheetId: this.sheetId },
-        update: {
+      });
+
+      if (existingData) {
+        await this.sheetDataRepository.update(existingData.id, {
           data: JSON.parse(JSON.stringify(data)),
           lastSync: new Date(),
-        },
-        create: {
+        });
+      } else {
+        const newSheetData = this.sheetDataRepository.create({
           sheetId: this.sheetId,
           data: JSON.parse(JSON.stringify(data)),
           lastSync: new Date(),
-        },
-      });
+        });
+        await this.sheetDataRepository.save(newSheetData);
+      }
     } catch (error) {
       this.logger.error('Erro ao salvar dados no banco:', error);
       // Não falhar se não conseguir salvar no banco

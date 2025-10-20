@@ -26,8 +26,7 @@ RUN npm run build
 # Build backend
 WORKDIR /app/apps/backend
 
-# Gerar Prisma Client (usando engine library)
-RUN npx prisma generate
+# Build da aplicação (sem Prisma!)
 RUN npm run build
 
 # Voltar para diretório raiz
