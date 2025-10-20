@@ -2,9 +2,11 @@
 
 ## 🔧 Configuração Completa
 
-### Database (Railway PostgreSQL)
+### Database (Railway PostgreSQL + Prisma Data Proxy)
 ```env
 DATABASE_URL=${{Postgres.DATABASE_URL}}
+DIRECT_URL=${{Postgres.DATABASE_URL}}
+PRISMA_ENGINE_TYPE=library
 ```
 
 ### Google OAuth2
