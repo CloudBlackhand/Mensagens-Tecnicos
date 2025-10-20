@@ -26,8 +26,8 @@ RUN npm run build
 # Build backend
 WORKDIR /app/apps/backend
 
-# Forçar geração do Prisma Client com engine correto
-RUN npx prisma generate --force
+# Gerar Prisma Client
+RUN npx prisma generate
 RUN npm run build
 
 # Verificar se o engine foi gerado corretamente
