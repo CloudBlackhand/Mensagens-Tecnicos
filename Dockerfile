@@ -28,6 +28,12 @@ WORKDIR /app/apps/backend
 RUN npx prisma generate
 RUN npm run build
 
+# Instalar OpenSSL para resolver warning do Prisma
+RUN apk add --no-cache openssl
+
+# Regenerar Prisma Client com OpenSSL disponível
+RUN npx prisma generate
+
 # Copiar engines do Prisma para múltiplos locais
 RUN mkdir -p /app/apps/backend/dist/node_modules/.prisma/client
 RUN mkdir -p /app/.prisma/client
@@ -39,6 +45,11 @@ RUN if [ -d "/app/apps/backend/node_modules/.prisma/client" ]; then \
       cp -r /app/apps/backend/node_modules/.prisma/client/* /app/.prisma/client/ 2>/dev/null || true; \
       cp -r /app/apps/backend/node_modules/.prisma/client/* /tmp/prisma-engines/ 2>/dev/null || true; \
     fi
+
+# Verificar se o engine foi copiado corretamente
+RUN ls -la /app/apps/backend/dist/node_modules/.prisma/client/ || true
+RUN ls -la /app/.prisma/client/ || true
+RUN ls -la /tmp/prisma-engines/ || true
 
 # Voltar para diretório raiz e configurar usuário não-root
 WORKDIR /app
